@@ -1,0 +1,16 @@
+{
+  "name": "pirpc",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Two plain-HTML frontends talking to Pi over its RPC mode, one Pi subprocess per browser client.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test-mcp-direct.mjs && node test-smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "ws": "^8.18.0",
+    "zod": "^3.25.76"
+  }
+}

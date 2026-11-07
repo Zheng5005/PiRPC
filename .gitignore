@@ -1,0 +1,10 @@
+# dependencies
+node_modules/
+
+# runtime data (created automatically at startup; never publish)
+logs/
+uploads/
+output/
+
+# local agent tooling state
+.atl/

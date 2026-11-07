@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "time": {
+      "command": "node",
+      "args": ["mcp/time-server.mjs"],
+      "description": "Current time in any IANA timezone, time conversion between timezones, and the session message log with send timestamps"
+    },
+    "docx2pdf": {
+      "command": "node",
+      "args": ["mcp/docx2pdf-server.mjs"],
+      "description": "Convert Word documents from uploads/ to PDF in output/ (LibreOffice headless)"
+    }
+  }
+}
