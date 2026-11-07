@@ -1,28 +1,32 @@
 # PiRPC — two HTML frontends over Pi RPC mode, with MCP tools
 
-Two framework-free HTML chat frontends that talk to [Pi](https://github.com/earendil-works/pi) through its RPC mode, extended with two project-local MCP servers (time + Word→PDF).
+Two framework-free HTML chat frontends that talk to [Pi](https://github.com/earendil-works/pi) through its RPC mode, extended with two MCP servers (time + Word→PDF) hosted by the bridge over **streamable HTTP**.
 
 ## Architecture
 
 ```
 frontend-a.html ─┐
-                 ├─ WebSocket ── server.mjs ── stdio JSONL ── pi --mode rpc --no-session --approve  (one child per client)
-frontend-b.html ─┘                     │              │
-                 POST /upload ─────────┘              └─ MCP (project .pi/mcp.json):
-                 GET  /output/<pdf>                        mcp/time-server.mjs      → mcp__time__*
-                                                           mcp/docx2pdf-server.mjs → mcp__docx2pdf__*
+                 ├─ WebSocket ─ server.mjs ─ stdio JSONL ─ pi --mode rpc --no-session  (one child per client)
+frontend-b.html ─┘         │                    │
+        POST /upload ──────┘                    └─ MCP over streamable HTTP (stateless):
+        GET  /output/<pdf>                          /mcp/time      → mcp__time__*
+        POST /mcp/time, /mcp/docx2pdf               /mcp/docx2pdf  → mcp__docx2pdf__*
 ```
 
 - Pi's RPC mode is a JSONL protocol over stdin/stdout; a browser cannot reach a subprocess, so `server.mjs` bridges both sides.
 - **One `pi` child process per WebSocket connection** → each frontend has a fully independent session.
-- `--approve` makes each child trust the project `.pi/mcp.json`; the user-level pi configuration is untouched.
+- **The MCP servers run in-process behind the bridge** (stateless streamable HTTP, POST-only, JSON responses): the pi children connect to `http://localhost:3000/mcp/*`, so no server processes are spawned per client. The same server files still run standalone: `node mcp/time-server.mjs` (stdio, default) or `--http-port N` (own HTTP listener).
 
 ## MCP servers
 
-| Server | Tools | Notes |
+| Endpoint | Tools | Notes |
 |---|---|---|
-| `time` | `get_current_time`, `convert_time`, `get_session_log` | Any IANA timezone via `Intl`; formats `iso`/`unix`/`locale`/`human`; the log tool defaults to the calling client's own session log (`PIRPC_LOG_FILE`) |
-| `docx2pdf` | `convert_docx_to_pdf` | LibreOffice headless (`soffice`), input confined to `uploads/`, output in `output/` |
+| `/mcp/time` | `get_current_time`, `convert_time`, `get_session_log` | Any IANA timezone via `Intl`; formats `iso`/`unix`/`locale`/`human` |
+| `/mcp/docx2pdf` | `convert_docx_to_pdf` | LibreOffice headless (`soffice`); input confined to `uploads/`, output in `output/`; conversions serialized through a queue |
+
+**Per-session log routing:** each pi child inherits `PIRPC_LOG_FILE` (its client's log path) from the bridge and expands it into the `X-Log-File` request header (`.pi/mcp.json` uses `${PIRPC_LOG_FILE:-}`, which stays resolvable when pi runs outside the bridge — the tool then falls back). The header is validated to stay inside `logs/`.
+
+Note: the MCP urls in `.pi/mcp.json` hardcode port 3000; if you change `PORT`, update them too.
 
 ## Message logs
 
@@ -44,10 +48,13 @@ npm start          # http://localhost:3000 (PORT env var to change)
 ## Tests
 
 ```bash
-node test-mcp-direct.mjs   # deterministic MCP checks: zones, formats, confinement, real conversion (also creates uploads/fixture.docx)
-node test-smoke.mjs        # bridge basics: two clients, independent sessions
-node test-e2e-mcp.mjs      # full stack with a model: time query, upload+convert, log query (run test-mcp-direct first: reuses its fixture)
+npm test                   # test-mcp-direct (stdio servers: zones, confinement, conversion)
+                           # + test-smoke (bridge basics, two independent clients)
+node test-mcp-http.mjs     # MCP over the bridge's HTTP endpoints: routing header, guards, queue (bridge must be running)
+node test-e2e-mcp.mjs      # full stack with a model: time query, upload+convert, per-session log routing (bridge running; run npm test first for the fixture)
 ```
+
+Inspect the MCP connections like pi sees them: `pi mcp list` from this directory (the parent `Projects/` path is trusted in `~/.pi/agent/trust.json`).
 
 ## References
 
