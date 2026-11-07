@@ -53,7 +53,11 @@ check("get_state A succeeds", sa.success === true);
 check("get_state B succeeds", sb.success === true);
 
 // 2. prompt on A only
-const bCountBefore = b.records.length;
+// B's own pi child asynchronously emits extension UI records (status bars,
+// skill-registry notifications) that RPC mode forwards; they are B's own
+// lifecycle, not leakage. Independence means: no CHAT records from A's run.
+const CHAT_RECORD_TYPES = new Set(["message_start", "message_update", "message_end", "turn_start", "turn_end", "agent_start", "agent_end", "agent_settled", "tool_execution_start", "tool_execution_update", "tool_execution_end", "bash_execution_update"]);
+const bChatCountBefore = b.records.filter((r) => CHAT_RECORD_TYPES.has(r.type)).length;
 a.send({ id: "a-2", type: "prompt", message: "Reply with exactly: OK" });
 const promptResp = await a.waitFor((r) => r.type === "response" && r.id === "a-2", 30_000, "prompt response");
 check("prompt accepted", promptResp.success === true, JSON.stringify(promptResp.data));
@@ -62,8 +66,9 @@ const deltas = [];
 a.waitFor((r) => r.type === "agent_settled", 120_000, "agent_settled").then(() => {
   check("A streamed text deltas", deltas.length > 0, `${deltas.length} deltas, text=${JSON.stringify(deltas.join(""))}`);
   check("agent_settled received on A", true);
-  check("B received nothing from A's run", b.records.length === bCountBefore,
-        `${b.records.length - bCountBefore} records`);
+  const bChatCountAfter = b.records.filter((r) => CHAT_RECORD_TYPES.has(r.type)).length;
+  check("B received no chat records from A's run", bChatCountAfter === bChatCountBefore,
+        `${bChatCountAfter - bChatCountBefore} chat records (extension UI noise excluded: ${b.records.length - bChatCountAfter} non-chat records)`);
   const failed = results.filter(([, ok]) => !ok).length;
   clearTimeout(deadline);
   console.log(failed === 0 ? "\nALL PASS" : `\n${failed} FAILURES`);
