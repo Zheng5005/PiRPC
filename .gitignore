@@ -8,3 +8,6 @@ output/
 
 # local agent tooling state
 .atl/
+
+# local ODD tracking
+odd/

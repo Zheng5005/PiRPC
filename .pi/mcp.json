@@ -1,13 +1,14 @@
 {
   "mcpServers": {
     "time": {
-      "command": "node",
-      "args": ["mcp/time-server.mjs"],
+      "url": "http://localhost:3000/mcp/time",
+      "headers": {
+        "X-Log-File": "${PIRPC_LOG_FILE:-}"
+      },
       "description": "Current time in any IANA timezone, time conversion between timezones, and the session message log with send timestamps"
     },
     "docx2pdf": {
-      "command": "node",
-      "args": ["mcp/docx2pdf-server.mjs"],
+      "url": "http://localhost:3000/mcp/docx2pdf",
       "description": "Convert Word documents from uploads/ to PDF in output/ (LibreOffice headless)"
     }
   }

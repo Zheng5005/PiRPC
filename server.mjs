@@ -8,6 +8,9 @@
 //   3. accepts Word uploads on POST /upload?name=<file.docx> into uploads/
 //   4. serves converted PDFs from output/ at /output/<file>.pdf
 //   5. logs every chat message with its timestamp to logs/<session>.jsonl
+//   6. hosts the two MCP servers over streamable HTTP (stateless) at
+//      /mcp/time and /mcp/docx2pdf — the pi children connect to these urls,
+//      so 2N spawned server processes become zero
 //
 // --approve lets each child trust this project's .pi/mcp.json (time and
 // docx2pdf servers) without touching the user-level pi configuration.
@@ -18,6 +21,8 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { basename, extname, join, normalize, resolve, sep } from "node:path";
 import { WebSocketServer } from "ws";
+import { handleDocxHttp } from "./mcp/docx2pdf-server.mjs";
+import { handleTimeHttp } from "./mcp/time-server.mjs";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const PUBLIC_DIR = new URL("./public/", import.meta.url).pathname;
@@ -26,6 +31,44 @@ const UPLOADS_DIR = resolve(new URL("./uploads/", import.meta.url).pathname);
 const OUTPUT_DIR = resolve(new URL("./output/", import.meta.url).pathname);
 const PI_ARGS = ["--mode", "rpc", "--no-session", "--approve"];
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_MCP_BYTES = 1024 * 1024;
+
+// Streamable-HTTP MCP endpoints (stateless, POST-only). The time server
+// routes its session-log default from the X-Log-File header pi sends.
+const MCP_ROUTES = {
+  "/mcp/time": handleTimeHttp,
+  "/mcp/docx2pdf": handleDocxHttp,
+};
+
+async function handleMcp(req, res, urlPath) {
+  if (req.method !== "POST") {
+    res.writeHead(405, { allow: "POST" }).end();
+    return;
+  }
+  if (!String(req.headers["content-type"] ?? "").includes("application/json")) {
+    res.writeHead(415).end("content-type must be application/json");
+    return;
+  }
+  const chunks = [];
+  let received = 0;
+  for await (const chunk of req) {
+    received += chunk.length;
+    if (received > MAX_MCP_BYTES) {
+      res.writeHead(413).end("request too large");
+      req.destroy();
+      return;
+    }
+    chunks.push(chunk);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    res.writeHead(400).end("invalid JSON body");
+    return;
+  }
+  await MCP_ROUTES[urlPath](req, res, parsed);
+}
 
 for (const dir of [LOG_DIR, UPLOADS_DIR, OUTPUT_DIR]) await mkdir(dir, { recursive: true });
 
@@ -89,6 +132,7 @@ async function handleOutput(req, res, urlPath) {
 
 const server = createServer(async (req, res) => {
   const urlPath = (req.url ?? "/").split("?")[0];
+  if (urlPath in MCP_ROUTES) return handleMcp(req, res, urlPath);
   if (req.method === "POST" && urlPath === "/upload") return handleUpload(req, res);
   if (req.method !== "GET") {
     res.writeHead(405).end("method not allowed");
