@@ -47,8 +47,8 @@ context clean."
 ## Tasks
 
 - T1 — S1, S2, S5 — Parent: implement delegate MCP server and deterministic direct tests — status: done — commit: `2f6f7c3`
-- T2 — S3, S4, S5 — Parent: register delegate, route parent through it, update E2E assertions — status: implemented; E2E in T4 — commit: pending
-- T3 — S6 — Parent: document delegation architecture and operational configuration — commit: pending
+- T2 — S3, S4, S5 — Parent: register delegate, route parent through it, update E2E assertions — status: implemented; E2E in T4 — commit: `6ac1099`
+- T3 — S6 — Parent: document delegation architecture and operational configuration — status: done — commit: pending
 - T4 — S1-S6 — Independent verifier + parent: run focused, full, and high-risk verification — commit: N/A
 
 ## Log
@@ -62,3 +62,4 @@ context clean."
 - L7 — Base comparison: a `git archive HEAD` scratch copy also failed `get_current_time UTC iso` with `+00:00` instead of `Z` (exit 1), proving that failure predates this feature. T1 syntax checks passed.
 - L8 — T2: `server.mjs` excludes direct docx2pdf tools and adds parent-only delegation guidance; `.pi/mcp.json` registers the delegate with a 180-second MCP timeout; E2E now requires delegation and rejects a direct conversion call. Syntax and JSON checks passed.
 - L9 — Delivery strategy: `auto-chain` if PRs are requested. T1 is an independent high-risk review slice at `2f6f7c3` (404 authored lines, coherent server + tests + tracking); later work units remain separate. No push or PR is authorized.
+- L10 — T3: README documents the three-server architecture, parent-only prompt and exclusion, child lifecycle, model/timeout overrides, and deterministic versus real-model tests. `git diff --check` and balanced Markdown fence check passed.
