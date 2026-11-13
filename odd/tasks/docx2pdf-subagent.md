@@ -50,7 +50,7 @@ context clean."
 - T2 — S3, S4, S5 — Parent: register delegate, route parent through it, update E2E assertions — status: implemented; E2E in T4 — commit: `6ac1099`
 - T3 — S6 — Parent: document delegation architecture and operational configuration — status: done — commit: `53266f5`
 - T4 — S1-S6 — Independent verifier + parent: run focused, full, and high-risk verification — status: blocked; parent checks complete, independent verifier unavailable — commit: N/A
-- T5 — S2, S5 — Parent: expose codemode as the MCP transport in the restricted child and re-run real conversion — status: done — commit: pending
+- T5 — S2, S5 — Parent: expose codemode as the MCP transport in the restricted child and re-run real conversion — status: done — commit: `504880f`
 
 ## Log
 
@@ -70,3 +70,6 @@ context clean."
 - L14 — Smoke baseline: the same `B received nothing from A's run` failure (3 records) occurs on a clean `origin/main` archive, so it predates this feature.
 - L15 — Invalid verification attempt: the first post-fix E2E connected to an orphaned baseline server on port 3000 while the new server failed with `EADDRINUSE`; its direct-conversion result is not evidence about the fix. The orphan's cwd was verified as the parent-created baseline scratch directory before stopping PID 43756 with SIGTERM. A fresh bounded run is required.
 - L16 — T5 GREEN: all 10 delegate checks passed after adding codemode; only the baseline UTC failure remains in the direct suite. Valid real E2E on a clean port exited 0 with all checks passing: time tool, upload, delegate rather than direct docx2pdf, downloadable `%PDF-` response, session log, and bridge log. Server PID 47593 was cleaned up by the runner trap.
+- L17 — Work-unit history: T1 `2f6f7c3`; T2 `6ac1099`; T3 `53266f5`; T5 `504880f`. `auto-chain` slice boundaries remain one commit per work unit if PRs are requested. Final feature diff before this closure record: 461 insertions and 23 deletions across 8 files; no push or PR performed.
+- L18 — Final cleanup and structural checks passed; port 3000 is free. Pre-existing untracked `docs/` and `pnpm-lock.yaml` remain untouched and uncommitted.
+- L19 — Risk: item 2 (uploads/ confinement and restricted child-process execution). Independent verifier setup was rejected before any probes, so zero independent tests ran and that proof remains unavailable; all applicable parent-run checks are complete.
