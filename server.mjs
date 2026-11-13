@@ -9,8 +9,10 @@
 //   4. serves converted PDFs from output/ at /output/<file>.pdf
 //   5. logs every chat message with its timestamp to logs/<session>.jsonl
 //
-// --approve lets each child trust this project's .pi/mcp.json (time and
-// docx2pdf servers) without touching the user-level pi configuration.
+// --approve lets each child trust this project's .pi/mcp.json (time,
+// docx2pdf, and delegate servers) without touching the user-level config.
+// The parent cannot call docx2pdf directly; its prompt routes Word conversion
+// through the delegate so conversion details stay out of this conversation.
 
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -24,7 +26,14 @@ const PUBLIC_DIR = new URL("./public/", import.meta.url).pathname;
 const LOG_DIR = new URL("./logs/", import.meta.url).pathname;
 const UPLOADS_DIR = resolve(new URL("./uploads/", import.meta.url).pathname);
 const OUTPUT_DIR = resolve(new URL("./output/", import.meta.url).pathname);
-const PI_ARGS = ["--mode", "rpc", "--no-session", "--approve"];
+const DELEGATE_PROMPT = "When the user asks to convert a Word document to PDF, use the delegate_docx2pdf_conversion tool. This delegates the conversion to a specialized sub-agent, keeping this conversation's context clean.";
+const PI_ARGS = [
+  "--mode", "rpc",
+  "--no-session",
+  "--approve",
+  "--exclude-tools", "mcp__docx2pdf__*",
+  "--append-system-prompt", DELEGATE_PROMPT,
+];
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 for (const dir of [LOG_DIR, UPLOADS_DIR, OUTPUT_DIR]) await mkdir(dir, { recursive: true });

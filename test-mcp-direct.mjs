@@ -1,9 +1,9 @@
-// Deterministic checks for both MCP servers (no model involved).
+// Deterministic checks for all MCP servers (no model involved).
 // Run: node test-mcp-direct.mjs
 import { execFile } from "node:child_process";
 import { mkdtemp, writeFile, readFile, appendFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -15,9 +15,13 @@ const check = (name, ok, extra = "") => {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${extra ? ` — ${extra}` : ""}`);
 };
 
-async function connect(script) {
+async function connect(script, env = {}) {
   const client = new Client({ name: "mcp-direct-test", version: "0.0.1" });
-  await client.connect(new StdioClientTransport({ command: "node", args: [script] }));
+  await client.connect(new StdioClientTransport({
+    command: "node",
+    args: [script],
+    env: { ...process.env, ...env },
+  }));
   return client;
 }
 const call = async (client, name, args) => {
@@ -77,6 +81,64 @@ if (!conv2.isError) {
 check("docx2pdf converts fixture.docx", !conv2.isError && pdfOk, conv2.json?.downloadUrl ?? conv2.text.slice(0, 120));
 
 await d2p.close();
+
+// --- delegate server: a fake Pi child keeps these checks deterministic ---
+const childRecord = join(fixtureDir, "delegate-child.jsonl");
+const delegateEnv = {
+  PIRPC_PI_BIN: resolve("test-fixtures/fake-pi.mjs"),
+  PIRPC_FAKE_PI_RECORD: childRecord,
+};
+const delegate = await connect("mcp/delegate-server.mjs", delegateEnv);
+
+const delegateEscape = await call(delegate, "delegate_docx2pdf_conversion", { inputPath: "../secret.docx" });
+check("delegate rejects ../ escape", delegateEscape.isError && delegateEscape.text.includes("uploads/"));
+const delegateAbsolute = await call(delegate, "delegate_docx2pdf_conversion", { inputPath: "/etc/passwd" });
+check("delegate rejects absolute path", delegateAbsolute.isError);
+const delegateBadExt = await call(delegate, "delegate_docx2pdf_conversion", { inputPath: "notes.txt" });
+check("delegate rejects non-Word extension", delegateBadExt.isError && delegateBadExt.text.includes(".docx"));
+const delegateMissing = await call(delegate, "delegate_docx2pdf_conversion", { inputPath: "missing.docx" });
+check("delegate rejects non-existent input", delegateMissing.isError);
+
+const delegated = await call(delegate, "delegate_docx2pdf_conversion", { inputPath: "fixture.docx" });
+check(
+  "delegate returns the child conversion result",
+  !delegated.isError && delegated.json?.downloadUrl === "/output/fixture.pdf" && delegated.json?.pdfPath.endsWith("/output/fixture.pdf"),
+  delegated.json?.downloadUrl ?? delegated.text.slice(0, 120),
+);
+const childEvents = (await readFile(childRecord, "utf8")).trim().split("\n").map(JSON.parse);
+const childArgs = childEvents[0].args;
+check(
+  "delegate child is ephemeral and restricted to docx2pdf",
+  ["--mode", "rpc", "--no-session", "--approve", "--model", "deepseek-v4.1-flash", "--tools", "codemode,mcp__docx2pdf__*"]
+    .every((value) => childArgs.includes(value)),
+);
+check(
+  "delegate sends the conversion prompt over RPC",
+  childEvents.some((event) => event.prompt?.type === "prompt" && event.prompt.message ===
+    "Convert the file fixture.docx to PDF using the convert_docx_to_pdf tool. Return the PDF path and download URL."),
+);
+await delegate.close();
+
+const missingResult = await connect("mcp/delegate-server.mjs", {
+  ...delegateEnv,
+  PIRPC_FAKE_PI_BEHAVIOR: "missing",
+});
+const noConversion = await call(missingResult, "delegate_docx2pdf_conversion", { inputPath: "fixture.docx" });
+check("delegate rejects a run without a conversion result", noConversion.isError && noConversion.text.includes("conversion result"));
+await missingResult.close();
+
+const timeoutRecord = join(fixtureDir, "delegate-timeout.jsonl");
+const hanging = await connect("mcp/delegate-server.mjs", {
+  ...delegateEnv,
+  PIRPC_FAKE_PI_BEHAVIOR: "timeout",
+  PIRPC_FAKE_PI_RECORD: timeoutRecord,
+  PIRPC_DELEGATE_TIMEOUT_MS: "50",
+});
+const timedOut = await call(hanging, "delegate_docx2pdf_conversion", { inputPath: "fixture.docx" });
+check("delegate terminates a timed-out child", timedOut.isError && timedOut.text.includes("timed out"));
+const timeoutEvents = (await readFile(timeoutRecord, "utf8")).trim().split("\n").map(JSON.parse);
+check("delegate timeout sends SIGTERM", timeoutEvents.some((event) => event.signal === "SIGTERM"));
+await hanging.close();
 
 const failed = results.filter(([, ok]) => !ok).length;
 console.log(failed === 0 ? "\nALL PASS" : `\n${failed} FAILURES`);
