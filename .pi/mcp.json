@@ -9,6 +9,12 @@
       "command": "node",
       "args": ["mcp/docx2pdf-server.mjs"],
       "description": "Convert Word documents from uploads/ to PDF in output/ (LibreOffice headless)"
+    },
+    "delegate": {
+      "command": "node",
+      "args": ["mcp/delegate-server.mjs"],
+      "description": "Delegate Word-to-PDF conversion to an isolated sub-agent (keeps parent context clean)",
+      "timeout": 180
     }
   }
 }

@@ -49,16 +49,20 @@ const t1 = await prompt(
 );
 check("agent called mcp__time__get_current_time", t1.called, t1.called ? "" : `tools seen: ${t1.tools.join(", ") || "none"}`);
 
-// 2. upload + docx2pdf
+// 2. upload + delegated docx2pdf
 const fixture = await readFile("uploads/fixture.docx");
 const up = await fetch(`http://localhost:3000/upload?name=${encodeURIComponent("e2e.docx")}`, { method: "POST", body: fixture }).then((r) => r.json());
 check("upload e2e.docx", up.ok === true, up.path);
 
 const t2 = await prompt(
-  "Convert the Word document uploads/e2e.docx to PDF using your docx2pdf MCP tool.",
-  "mcp__docx2pdf__convert_docx_to_pdf", "convert prompt",
+  "Convert the Word document e2e.docx to PDF using your delegate_docx2pdf_conversion MCP tool.",
+  "mcp__delegate__delegate_docx2pdf_conversion", "convert prompt",
 );
-check("agent called mcp__docx2pdf__convert_docx_to_pdf", t2.called, t2.called ? "" : `tools seen: ${t2.tools.join(", ") || "none"}`);
+check(
+  "agent used delegate instead of direct docx2pdf",
+  t2.called && !t2.tools.includes("mcp__docx2pdf__convert_docx_to_pdf"),
+  `tools seen: ${t2.tools.join(", ") || "none"}`,
+);
 const dl = await fetch("http://localhost:3000/output/e2e.pdf");
 check("converted PDF downloadable at /output/e2e.pdf", dl.status === 200 && (await dl.text()).startsWith("%PDF-"));
 
