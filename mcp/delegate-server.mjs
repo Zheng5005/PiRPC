@@ -68,7 +68,9 @@ async function convertWithChild(inputPath) {
     "--no-session",
     "--approve",
     "--model", MODEL,
-    "--tools", "mcp__docx2pdf__*",
+    // This Pi installation exposes MCP calls through codemode. The allowlist
+    // still excludes bash, filesystem tools, and every other MCP server.
+    "--tools", "codemode,mcp__docx2pdf__*",
   ];
 
   return new Promise((resolveResult, rejectResult) => {

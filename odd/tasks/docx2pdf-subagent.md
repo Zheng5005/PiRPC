@@ -48,8 +48,9 @@ context clean."
 
 - T1 — S1, S2, S5 — Parent: implement delegate MCP server and deterministic direct tests — status: done — commit: `2f6f7c3`
 - T2 — S3, S4, S5 — Parent: register delegate, route parent through it, update E2E assertions — status: implemented; E2E in T4 — commit: `6ac1099`
-- T3 — S6 — Parent: document delegation architecture and operational configuration — status: done — commit: pending
-- T4 — S1-S6 — Independent verifier + parent: run focused, full, and high-risk verification — commit: N/A
+- T3 — S6 — Parent: document delegation architecture and operational configuration — status: done — commit: `53266f5`
+- T4 — S1-S6 — Independent verifier + parent: run focused, full, and high-risk verification — status: blocked; parent checks complete, independent verifier unavailable — commit: N/A
+- T5 — S2, S5 — Parent: expose codemode as the MCP transport in the restricted child and re-run real conversion — status: done — commit: pending
 
 ## Log
 
@@ -63,3 +64,9 @@ context clean."
 - L8 — T2: `server.mjs` excludes direct docx2pdf tools and adds parent-only delegation guidance; `.pi/mcp.json` registers the delegate with a 180-second MCP timeout; E2E now requires delegation and rejects a direct conversion call. Syntax and JSON checks passed.
 - L9 — Delivery strategy: `auto-chain` if PRs are requested. T1 is an independent high-risk review slice at `2f6f7c3` (404 authored lines, coherent server + tests + tracking); later work units remain separate. No push or PR is authorized.
 - L10 — T3: README documents the three-server architecture, parent-only prompt and exclusion, child lifecycle, model/timeout overrides, and deterministic versus real-model tests. `git diff --check` and balanced Markdown fence check passed.
+- L11 — Independent verification unavailable: `gentle-ai-verify` rejected admission because its launch lacked a supported inline `Risk: item N` declaration. Runtime explicitly forbids retry; parent checks continue inline and missing independent proof will be reported.
+- L12 — Initial inline direct run: all 10 delegate checks passed; the already-reproduced baseline UTC failure remains the only direct-test failure. `pi --list-models deepseek-v4.1-flash` found `opencode-go/deepseek-v4.1-flash`. Syntax, JSON, and `git diff --check` passed.
+- L13 — Real E2E: parent called the delegate and direct docx2pdf was absent, but no PDF was produced; the delegate returned `Pi settled without a conversion result.` Exact child reproduction showed `mcp__docx2pdf` classified as a codemode server and the model emitting bash calls as text because codemode was not enabled. RED added for `codemode,mcp__docx2pdf__*`; only the updated allowlist check failed.
+- L14 — Smoke baseline: the same `B received nothing from A's run` failure (3 records) occurs on a clean `origin/main` archive, so it predates this feature.
+- L15 — Invalid verification attempt: the first post-fix E2E connected to an orphaned baseline server on port 3000 while the new server failed with `EADDRINUSE`; its direct-conversion result is not evidence about the fix. The orphan's cwd was verified as the parent-created baseline scratch directory before stopping PID 43756 with SIGTERM. A fresh bounded run is required.
+- L16 — T5 GREEN: all 10 delegate checks passed after adding codemode; only the baseline UTC failure remains in the direct suite. Valid real E2E on a clean port exited 0 with all checks passing: time tool, upload, delegate rather than direct docx2pdf, downloadable `%PDF-` response, session log, and bridge log. Server PID 47593 was cleaned up by the runner trap.

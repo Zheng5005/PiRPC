@@ -109,7 +109,7 @@ const childEvents = (await readFile(childRecord, "utf8")).trim().split("\n").map
 const childArgs = childEvents[0].args;
 check(
   "delegate child is ephemeral and restricted to docx2pdf",
-  ["--mode", "rpc", "--no-session", "--approve", "--model", "deepseek-v4.1-flash", "--tools", "mcp__docx2pdf__*"]
+  ["--mode", "rpc", "--no-session", "--approve", "--model", "deepseek-v4.1-flash", "--tools", "codemode,mcp__docx2pdf__*"]
     .every((value) => childArgs.includes(value)),
 );
 check(

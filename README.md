@@ -12,7 +12,7 @@ frontend-b.html ─┘                     │                    │
                  GET  /output/<pdf>                         └─ mcp__delegate__*
                                                                    │
                                       ephemeral pi child ──────────┘
-                                      (--tools mcp__docx2pdf__*)
+                                      (--tools codemode,mcp__docx2pdf__*)
                                                │
                                                └─ convert_docx_to_pdf → LibreOffice
 ```
@@ -28,7 +28,7 @@ frontend-b.html ─┘                     │                    │
 |---|---|---|
 | `time` | `get_current_time`, `convert_time`, `get_session_log` | Any IANA timezone via `Intl`; formats `iso`/`unix`/`locale`/`human`; the log tool defaults to the calling client's own session log (`PIRPC_LOG_FILE`) |
 | `docx2pdf` | `convert_docx_to_pdf` | LibreOffice headless (`soffice`), input confined to `uploads/`, output in `output/`; hidden from the bridge's parent Pi |
-| `delegate` | `delegate_docx2pdf_conversion` | Spawns an ephemeral Pi RPC child restricted to `mcp__docx2pdf__*`, then returns only `{ input, pdfPath, downloadUrl }` |
+| `delegate` | `delegate_docx2pdf_conversion` | Spawns an ephemeral Pi RPC child restricted to `codemode` + `mcp__docx2pdf__*` (no shell or filesystem tools), then returns only `{ input, pdfPath, downloadUrl }` |
 
 ## Message logs
 
@@ -38,7 +38,7 @@ Every prompt and every final assistant message is appended to `logs/<timestamp>-
 
 1. In the frontend, click 📎 and pick a `.docx`/`.doc` → `POST /upload` saves it into `uploads/` (25 MB max, extension + basename validated).
 2. Ask Pi: "convert `<name>` to PDF" → the parent calls `mcp__delegate__delegate_docx2pdf_conversion`.
-3. The delegate starts `pi --mode rpc --no-session --approve --model deepseek-v4.1-flash --tools mcp__docx2pdf__*`. The child calls `convert_docx_to_pdf`; after `agent_settled`, the delegate closes RPC stdin and reaps the child.
+3. The delegate starts `pi --mode rpc --no-session --approve --model deepseek-v4.1-flash --tools codemode,mcp__docx2pdf__*`. The child calls `convert_docx_to_pdf` through `codemode` (the MCP transport in this Pi installation); after `agent_settled`, the delegate closes RPC stdin and reaps the child.
 4. Only the structured conversion result returns to the parent. The reply includes `/output/<name>.pdf`, rendered as a download link in the chat.
 
 The delegate validates the same `uploads/` confinement and Word extensions as the conversion server. It terminates a child after 120 seconds (configurable with `PIRPC_DELEGATE_TIMEOUT_MS`), with `SIGTERM` followed by a `SIGKILL` fallback. Set `PIRPC_DELEGATE_MODEL` if the default model is not configured; `PIRPC_PI_BIN` overrides the Pi executable, primarily for deterministic tests.
